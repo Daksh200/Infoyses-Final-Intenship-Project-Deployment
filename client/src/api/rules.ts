@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { FraudRule, RuleStatus, TriggerTrend, SeverityDistribution, ConditionHit, TriggeredClaim, RuleLogic, RuleVersion } from '@/types/fraud';
+import { config } from '../config';
 
 const API_URL = `${config.API_BASE_URL}/rules`;
 
