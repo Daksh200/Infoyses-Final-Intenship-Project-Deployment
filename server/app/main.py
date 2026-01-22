@@ -13,6 +13,7 @@ origins = [
     "http://localhost:8081",
     "http://localhost:5173",
     "http://localhost:3000",
+    "https://infoyses-final-intenship-project-de.vercel.app",
 ]
 
 # Add production frontend URL if set
@@ -28,9 +29,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router, prefix="/api")
-app.include_router(rules.router, prefix="/api")
-app.include_router(audit.router, prefix="/api")
+app.include_router(auth.router)
+app.include_router(rules.router)
+app.include_router(audit.router)
 
 @app.get("/")
 def read_root():
