@@ -2,9 +2,8 @@ services:
   - type: web
     name: fraud-detection-api
     runtime: python3
-    rootDir: server
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r server/requirements.txt
+    startCommand: uvicorn server.app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
         value: postgresql://neondb_owner:npg_5wv7girsFPLM@ep-still-wildflower-ahwfzeyv-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
