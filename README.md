@@ -1,6 +1,6 @@
 # Fraud Rules Engine – Frontend Demo
 
-<img src="client/public/Fraud Rule page.png" alt="Fraud Rule page" />
+<img src="client/public/dashboard.png" alt="Fraud Rule page" />
 
 A modern web app to design, test, and monitor fraud detection rules. This project showcases an intuitive interface for rule creation, versioning, and performance exploration.
 
@@ -65,3 +65,4 @@ Acknowledgments
 - Built under the Infosys Springboard Internship.
 - UI built with Shadcn UI components and TailwindCSS.
 - Icons by Lucide.
+
