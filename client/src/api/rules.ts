@@ -1,120 +1,171 @@
-import axios from 'axios';
+// Frontend-only mock API implementation for rules
+// Replaces network calls with local mock data so the app works without a backend
 import { FraudRule, RuleStatus, TriggerTrend, SeverityDistribution, ConditionHit, TriggeredClaim, RuleLogic, RuleVersion } from '@/types/fraud';
-import { config } from '../config';
+import { mockRules, mockRulePerformance, generateTriggerTrends, generateTriggeredClaims } from '@/data/mockData';
 
-const API_URL = `${config.API_BASE_URL}/rules`;
+// Helpers
+const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
 export const getRules = async (): Promise<FraudRule[]> => {
-  const response = await axios.get(API_URL);
-  return response.data.map((rule: any) => ({
-    ...rule,
-    id: rule.id.toString(),
-    ruleId: rule.rule_id,
-    owner: rule.ownerName, // Keep backward compatibility
-    versions: [], // Backend doesn't populate this in list view
-  }));
+  await delay(200);
+  // Return a shallow copy to avoid mutation side-effects
+  return clone(mockRules);
 };
 
 export const getRule = async (id: string): Promise<FraudRule> => {
-  const { data } = await axios.get(`${API_URL}/${id}`);
-  return {
-    ...data,
-    id: data?.id != null ? data.id.toString() : data?.id,
-    ruleId: data?.ruleId ?? data?.rule_id,
-    owner: data?.owner ?? data?.ownerName,
-  } as FraudRule;
+  await delay(150);
+  const found = mockRules.find(r => r.id === id || r.ruleId === id);
+  if (!found) throw new Error('Rule not found');
+  return clone(found);
 };
 
 export const createRule = async (rule: Partial<FraudRule>): Promise<FraudRule> => {
-  const response = await axios.post(API_URL, rule);
-  return response.data;
+  await delay(200);
+  const newRule: FraudRule = {
+    id: (mockRules.length + 1).toString(),
+    ruleId: rule.ruleId || `RL-FAKE-${Date.now()}`,
+    name: rule.name || 'New Rule',
+    description: rule.description || '',
+    category: (rule.category as any) || 'transaction',
+    severity: (rule.severity as any) || 'low',
+    status: (rule.status as any) || 'inactive',
+    triggers24h: 0,
+    triggerDelta: 0,
+    lastUpdated: 'just now',
+    createdBy: rule.createdBy || 'You',
+    owner: rule.owner || 'You',
+    tags: rule.tags || [],
+    conditionSummary: rule.conditionSummary || '',
+    logic: rule.logic as any,
+    versions: [
+      { id: '1', version: 'v1.0', createdAt: 'now', createdBy: 'You', notes: '', isActive: true, isDraft: false },
+    ],
+    currentVersion: 'v1.0',
+  };
+  // Do not mutate original mockRules to keep demo stateless; return the new rule as if created
+  return newRule;
 };
 
 export const updateRule = async (id: string, rule: Partial<FraudRule>): Promise<FraudRule> => {
-  const response = await axios.put(`${API_URL}/${id}`, rule);
-  return response.data;
+  await delay(150);
+  const existing = mockRules.find(r => r.id === id);
+  if (!existing) throw new Error('Rule not found');
+  return { ...existing, ...rule } as FraudRule;
 };
 
 export const deleteRule = async (id: string): Promise<void> => {
-  await axios.delete(`${API_URL}/${id}`);
+  await delay(100);
+  // No-op in mock mode
 };
 
 export const updateRuleStatus = async (id: string, status: RuleStatus): Promise<FraudRule> => {
-  const response = await axios.put(`${API_URL}/${id}`, { status });
-  return response.data;
+  await delay(120);
+  const existing = mockRules.find(r => r.id === id);
+  if (!existing) throw new Error('Rule not found');
+  return { ...existing, status } as FraudRule;
 };
 
 export const getRuleVersions = async (id: string): Promise<RuleVersion[]> => {
-  const response = await axios.get(`${API_URL}/${id}/versions`);
-  return response.data;
+  await delay(80);
+  const existing = mockRules.find(r => r.id === id);
+  return clone(existing?.versions || []);
 };
 
 export const updateRuleVersionNotes = async (versionId: string, notes: string): Promise<RuleVersion> => {
-  const response = await axios.put(`${API_URL}/versions/${versionId}`, { notes });
-  return response.data;
+  await delay(80);
+  // Find in any rule
+  const rule = mockRules.find(r => r.versions?.some(v => v.id === versionId));
+  const version = rule?.versions?.find(v => v.id === versionId);
+  if (!version) throw new Error('Version not found');
+  return { ...version, notes };
 };
 
 export const testRule = async (ruleData: any, payload: any): Promise<any> => {
-  try {
-    const response = await axios.post(`${API_URL}/test`, { ruleData, payload }, { timeout: 10000 });
-    return response.data;
-  } catch (error: any) {
-    throw error;
-  }
+  await delay(200);
+  // Very simple evaluator mock: if payload.amount > 1000 => triggered high
+  const amount = Number(payload?.amount ?? 0);
+  const triggered = amount > 1000;
+  return {
+    triggered,
+    severity: triggered ? 'high' : 'low',
+    reasons: triggered ? ['amount > 1000'] : ['no conditions met'],
+  };
 };
 
 // Performance API
 export const getRuleKpis = async (ruleId: string, days: number) => {
-  const { data } = await axios.get(`${API_URL}/${ruleId}/performance/kpis`, { params: { days } });
-  return data as { totalClaimsEvaluated: number; flagsTriggered: number; confirmedFraud: number; falsePositiveRate: number; hitRate: number; lastEvaluated: string };
+  await delay(120);
+  return {
+    totalClaimsEvaluated: mockRulePerformance.totalClaimsEvaluated,
+    flagsTriggered: mockRulePerformance.flagsTriggered,
+    confirmedFraud: mockRulePerformance.confirmedFraud,
+    falsePositiveRate: mockRulePerformance.falsePositiveRate,
+    hitRate: mockRulePerformance.hitRate,
+    lastEvaluated: mockRulePerformance.lastEvaluated,
+  };
 };
 
 export const getRuleTrends = async (ruleId: string, days: number) => {
-  const { data } = await axios.get(`${API_URL}/${ruleId}/performance/trends`, { params: { days } });
-  return data as TriggerTrend[];
+  await delay(100);
+  return generateTriggerTrends(days);
 };
 
 export const getRuleSeverity = async (ruleId: string, days: number) => {
-  const { data } = await axios.get(`${API_URL}/${ruleId}/performance/severity`, { params: { days } });
-  return data as SeverityDistribution;
+  await delay(90);
+  return clone(mockRulePerformance.severityDistribution);
 };
 
 export const getRuleConditions = async (ruleId: string, days: number) => {
-  const { data } = await axios.get(`${API_URL}/${ruleId}/performance/conditions`, { params: { days } });
-  return data as ConditionHit[];
+  await delay(90);
+  return clone(mockRulePerformance.conditionHitMap).map((c, idx) => ({
+    condition: c.condition,
+    percentage: c.percentage,
+    rank: idx + 1,
+  })) as any as ConditionHit[];
 };
 
 export const getTriggeredClaims = async (
   ruleId: string,
   opts: { days: number; severity?: string; decision?: string; page?: number; pageSize?: number; sort?: string }
 ) => {
-  const { days, severity, decision, page = 1, pageSize = 20, sort } = opts;
-  const skip = (page - 1) * pageSize;
-  const { data } = await axios.get(`${API_URL}/${ruleId}/performance/claims`, {
-    params: { days, severity, decision, skip, limit: pageSize, sort },
-  });
-  return data as { total: number; items: TriggeredClaim[] };
+  await delay(120);
+  const { severity, decision, page = 1, pageSize = 20, sort } = opts;
+  let items = generateTriggeredClaims();
+  if (severity) items = items.filter(i => i.severity === severity);
+  if (decision) items = items.filter(i => i.decision === decision);
+  if (sort === 'amount_desc') items = items.sort((a,b) => b.amount - a.amount);
+  if (sort === 'amount_asc') items = items.sort((a,b) => a.amount - b.amount);
+  const total = items.length;
+  const start = (page - 1) * pageSize;
+  const paged = items.slice(start, start + pageSize);
+  return { total, items: paged } as { total: number; items: TriggeredClaim[] };
 };
 
 export const getDecisionCounts = async (ruleId: string, days: number) => {
-  const { data } = await axios.get(`${API_URL}/${ruleId}/performance/decisions`, { params: { days } });
-  return data as { fraud: number; legitimate: number; pending: number };
+  await delay(80);
+  return { fraud: 56, legitimate: 210, pending: 28 };
 };
 
 export const getExecution = async (executionId: string | number) => {
-  const { data } = await axios.get(`${API_URL}/executions/${executionId}`);
-  return data as any;
+  await delay(80);
+  return { id: executionId, status: 'completed', result: 'Mock execution result' } as any;
 };
 
 export const cloneRule = async (ruleId: string) => {
-  const { data } = await axios.post(`${API_URL}/${ruleId}/clone`);
-  return data as FraudRule;
+  await delay(100);
+  const rule = mockRules.find(r => r.id === ruleId || r.ruleId === ruleId);
+  if (!rule) throw new Error('Rule not found');
+  const cloned: FraudRule = { ...clone(rule), id: `${Date.now()}`, ruleId: `${rule.ruleId}-CLONE` };
+  return cloned;
 };
 
 export const publishRule = async (
   ruleId: string,
   payload: { name?: string; description?: string; category?: string; severity?: string; tags?: string[]; conditionSummary?: string; logic: RuleLogic; notes?: string; version?: string }
 ) => {
-  const { data } = await axios.post(`${API_URL}/${ruleId}/publish`, payload);
-  return data as FraudRule;
+  await delay(150);
+  const base = mockRules.find(r => r.id === ruleId || r.ruleId === ruleId);
+  if (!base) throw new Error('Rule not found');
+  return { ...base, ...payload, currentVersion: payload.version || base.currentVersion } as FraudRule;
 };
