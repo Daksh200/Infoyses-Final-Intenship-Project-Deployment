@@ -2,7 +2,7 @@ import { FraudRule, RulePerformance, Admin, TriggerTrend, TriggeredClaim } from 
 
 export const currentAdmin: Admin = {
   id: '1',
-  name: 'Alexandra M.',
+  name: 'Daksh.',
   initials: 'AM',
   role: 'super_admin',
 };
@@ -104,8 +104,8 @@ export const mockRules: FraudRule[] = [
     triggers24h: 42,
     triggerDelta: 75,
     lastUpdated: '5 hours ago',
-    createdBy: 'Alexandra M.',
-    owner: 'Alexandra M.',
+    createdBy: 'Daksh.',
+    owner: 'Daksh.',
     tags: ['Geo', 'Location'],
     conditionSummary: 'geo_dist > 500 miles',
     logic: {
