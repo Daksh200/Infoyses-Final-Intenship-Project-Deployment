@@ -7,78 +7,152 @@ import { mockRules, mockRulePerformance, generateTriggerTrends, generateTriggere
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
+// localStorage-backed store so the demo persists in the browser
+const STORAGE_KEY = 'fraud_rules';
+
+const normalizeRule = (raw: any): FraudRule => {
+  const ownerName = raw.ownerName ?? raw.owner ?? raw.createdBy ?? 'You';
+  const ruleId = raw.ruleId ?? raw.rule_id ?? `RL-${Date.now()}`;
+  const versions = (raw.versions || []).map((v: any, idx: number) => ({
+    id: v.id?.toString() ?? String(idx + 1),
+    version: v.version ?? 'v1.0',
+    createdAt: v.createdAt ?? 'now',
+    createdBy: v.createdBy ?? ownerName,
+    notes: v.notes ?? '',
+    isActive: v.isActive ?? (raw.currentVersion ? v.version === raw.currentVersion : idx === 0),
+    isDraft: v.isDraft ?? false,
+    logic_snapshot: v.logic_snapshot ?? raw.logic ?? { groups: [] },
+  }));
+
+  return {
+    id: raw.id?.toString() ?? `${Date.now()}`,
+    ruleId,
+    name: raw.name ?? 'Untitled Rule',
+    description: raw.description ?? '',
+    category: raw.category ?? 'transaction',
+    severity: raw.severity ?? 'medium',
+    status: raw.status ?? 'draft',
+    triggers24h: Number(raw.triggers24h ?? 0),
+    triggerDelta: Number(raw.triggerDelta ?? 0),
+    lastUpdated: raw.lastUpdated ?? 'just now',
+    createdBy: raw.createdBy ?? ownerName,
+    ownerName,
+    tags: Array.isArray(raw.tags) ? raw.tags : [],
+    logic: raw.logic ?? { groups: [] },
+    versions,
+    currentVersion: raw.currentVersion ?? (versions[0]?.version ?? 'v1.0'),
+    conditionSummary: raw.conditionSummary ?? '',
+  } as FraudRule;
+};
+
+const loadRules = (): FraudRule[] => {
+  try {
+    const fromLs = localStorage.getItem(STORAGE_KEY);
+    if (fromLs) {
+      const parsed = JSON.parse(fromLs);
+      return parsed.map((r: any) => normalizeRule(r));
+    }
+  } catch {}
+  // First run: seed with mockRules (normalized) and persist
+  const seeded = mockRules.map(r => normalizeRule(r));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
+  return seeded;
+};
+
+const saveRules = (rules: FraudRule[]) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(rules));
+};
+
 export const getRules = async (): Promise<FraudRule[]> => {
-  await delay(200);
-  // Return a shallow copy to avoid mutation side-effects
-  return clone(mockRules);
+  await delay(120);
+  return clone(loadRules());
 };
 
 export const getRule = async (id: string): Promise<FraudRule> => {
-  await delay(150);
-  const found = mockRules.find(r => r.id === id || r.ruleId === id);
+  await delay(100);
+  const found = loadRules().find(r => r.id === id || r.ruleId === id);
   if (!found) throw new Error('Rule not found');
   return clone(found);
 };
 
-export const createRule = async (rule: Partial<FraudRule>): Promise<FraudRule> => {
-  await delay(200);
-  const newRule: FraudRule = {
-    id: (mockRules.length + 1).toString(),
-    ruleId: rule.ruleId || `RL-FAKE-${Date.now()}`,
-    name: rule.name || 'New Rule',
-    description: rule.description || '',
-    category: (rule.category as any) || 'transaction',
-    severity: (rule.severity as any) || 'low',
-    status: (rule.status as any) || 'inactive',
+export const createRule = async (rule: any): Promise<FraudRule> => {
+  await delay(150);
+  const all = loadRules();
+  const ownerName = rule.ownerName ?? rule.owner ?? 'You';
+  const logic = rule.logic ?? { groups: [] };
+  const newId = `${Date.now()}`;
+  const newRule: FraudRule = normalizeRule({
+    id: newId,
+    ruleId: rule.ruleId ?? rule.rule_id ?? `RL-${newId}`,
+    name: rule.name ?? 'New Rule',
+    description: rule.description ?? '',
+    category: rule.category ?? 'transaction',
+    severity: rule.severity ?? 'medium',
+    status: rule.status ?? 'draft',
     triggers24h: 0,
     triggerDelta: 0,
     lastUpdated: 'just now',
-    createdBy: rule.createdBy || 'You',
-    owner: rule.owner || 'You',
-    tags: rule.tags || [],
-    conditionSummary: rule.conditionSummary || '',
-    logic: rule.logic as any,
+    createdBy: 'You',
+    ownerName,
+    tags: Array.isArray(rule.tags) ? rule.tags : [],
+    conditionSummary: rule.conditionSummary ?? '',
+    logic,
     versions: [
-      { id: '1', version: 'v1.0', createdAt: 'now', createdBy: 'You', notes: '', isActive: true, isDraft: false },
+      { id: '1', version: 'v1.0', createdAt: 'now', createdBy: 'You', notes: '', isActive: true, isDraft: rule.status === 'draft', logic_snapshot: logic },
     ],
     currentVersion: 'v1.0',
-  };
-  // Do not mutate original mockRules to keep demo stateless; return the new rule as if created
-  return newRule;
+  });
+  const updated = [newRule, ...all];
+  saveRules(updated);
+  return clone(newRule);
 };
 
-export const updateRule = async (id: string, rule: Partial<FraudRule>): Promise<FraudRule> => {
-  await delay(150);
-  const existing = mockRules.find(r => r.id === id);
-  if (!existing) throw new Error('Rule not found');
-  return { ...existing, ...rule } as FraudRule;
+export const updateRule = async (id: string, patch: Partial<FraudRule>): Promise<FraudRule> => {
+  await delay(120);
+  const all = loadRules();
+  const idx = all.findIndex(r => r.id === id);
+  if (idx === -1) throw new Error('Rule not found');
+  const merged = normalizeRule({ ...all[idx], ...patch, lastUpdated: 'just now' });
+  all[idx] = merged;
+  saveRules(all);
+  return clone(merged);
 };
 
 export const deleteRule = async (id: string): Promise<void> => {
-  await delay(100);
-  // No-op in mock mode
+  await delay(80);
+  const all = loadRules().filter(r => r.id !== id);
+  saveRules(all);
 };
 
 export const updateRuleStatus = async (id: string, status: RuleStatus): Promise<FraudRule> => {
-  await delay(120);
-  const existing = mockRules.find(r => r.id === id);
-  if (!existing) throw new Error('Rule not found');
-  return { ...existing, status } as FraudRule;
+  await delay(80);
+  const all = loadRules();
+  const idx = all.findIndex(r => r.id === id);
+  if (idx === -1) throw new Error('Rule not found');
+  all[idx] = { ...all[idx], status, lastUpdated: 'just now' } as FraudRule;
+  saveRules(all);
+  return clone(all[idx]);
 };
 
 export const getRuleVersions = async (id: string): Promise<RuleVersion[]> => {
-  await delay(80);
-  const existing = mockRules.find(r => r.id === id);
-  return clone(existing?.versions || []);
+  await delay(60);
+  const rule = loadRules().find(r => r.id === id);
+  return clone(rule?.versions || []);
 };
 
 export const updateRuleVersionNotes = async (versionId: string, notes: string): Promise<RuleVersion> => {
-  await delay(80);
-  // Find in any rule
-  const rule = mockRules.find(r => r.versions?.some(v => v.id === versionId));
-  const version = rule?.versions?.find(v => v.id === versionId);
-  if (!version) throw new Error('Version not found');
-  return { ...version, notes };
+  await delay(60);
+  const all = loadRules();
+  for (const r of all) {
+    const vIdx = r.versions.findIndex(v => v.id === versionId);
+    if (vIdx !== -1) {
+      const updated = { ...r.versions[vIdx], notes } as RuleVersion;
+      r.versions[vIdx] = updated;
+      saveRules(all);
+      return clone(updated);
+    }
+  }
+  throw new Error('Version not found');
 };
 
 export const testRule = async (ruleData: any, payload: any): Promise<any> => {
@@ -153,19 +227,46 @@ export const getExecution = async (executionId: string | number) => {
 };
 
 export const cloneRule = async (ruleId: string) => {
-  await delay(100);
-  const rule = mockRules.find(r => r.id === ruleId || r.ruleId === ruleId);
-  if (!rule) throw new Error('Rule not found');
-  const cloned: FraudRule = { ...clone(rule), id: `${Date.now()}`, ruleId: `${rule.ruleId}-CLONE` };
-  return cloned;
+  await delay(90);
+  const all = loadRules();
+  const base = all.find(r => r.id === ruleId || r.ruleId === ruleId);
+  if (!base) throw new Error('Rule not found');
+  const newId = `${Date.now()}`;
+  const cloned: FraudRule = normalizeRule({ ...base, id: newId, ruleId: `${base.ruleId}-CLONE`, name: `${base.name} (Clone)`, lastUpdated: 'just now' });
+  const updated = [cloned, ...all];
+  saveRules(updated);
+  return clone(cloned);
 };
 
 export const publishRule = async (
   ruleId: string,
   payload: { name?: string; description?: string; category?: string; severity?: string; tags?: string[]; conditionSummary?: string; logic: RuleLogic; notes?: string; version?: string }
 ) => {
-  await delay(150);
-  const base = mockRules.find(r => r.id === ruleId || r.ruleId === ruleId);
-  if (!base) throw new Error('Rule not found');
-  return { ...base, ...payload, currentVersion: payload.version || base.currentVersion } as FraudRule;
+  await delay(100);
+  const all = loadRules();
+  const idx = all.findIndex(r => r.id === ruleId || r.ruleId === ruleId);
+  if (idx === -1) throw new Error('Rule not found');
+  const base = all[idx];
+  const nextVersion = payload.version ?? `v${(base.versions.length + 1).toFixed(1)}`;
+  const newVersion: RuleVersion = {
+    id: `${Date.now()}`,
+    version: nextVersion,
+    createdAt: 'now',
+    createdBy: 'You',
+    notes: payload.notes ?? '',
+    isActive: true,
+    isDraft: false,
+    logic_snapshot: payload.logic ?? base.logic,
+  };
+  const updated: FraudRule = normalizeRule({
+    ...base,
+    ...payload,
+    versions: [newVersion, ...base.versions],
+    currentVersion: nextVersion,
+    status: 'active',
+    lastUpdated: 'just now',
+  });
+  all[idx] = updated;
+  saveRules(all);
+  return clone(updated);
 };
