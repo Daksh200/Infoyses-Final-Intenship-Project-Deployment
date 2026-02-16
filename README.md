@@ -1,4 +1,6 @@
-# Fraud Rules Engine – Frontend Demo
+# Infosys Springboard Internship – Virtual 6.0
+# <b>Topic: </b> Python Insurance Comparision,Recommendation and Claim Assistance
+# Fraud Rules Engine 
 
 <img src="client/public/rules.png" alt="Fraud Rule page" />
 
@@ -58,5 +60,6 @@ Acknowledgments
 - Built under the Infosys Springboard Internship.
 - UI built with Shadcn UI components and TailwindCSS.
 - Icons by Lucide.
+
 
 
